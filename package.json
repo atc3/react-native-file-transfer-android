@@ -1,0 +1,28 @@
+{
+  "name": "react-native-image-upload-android",
+  "version": "0.0.1",
+  "description": "multipart/form-data image upload for react-native android",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blahoink/react-native-image-upload-android.git"
+  },
+  "keywords": [
+    "react-native",
+    "android",
+    "react-component",
+    "multipart",
+    "image",
+    "upload",
+    "image-upload"
+  ],
+  "author": "Albert Chen",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/blahoink/react-native-image-upload-android/issues"
+  },
+  "homepage": "https://github.com/blahoink/react-native-image-upload-android#readme",
+  "peerDependencies": {
+    "react-native": ">=0.16.0"
+  }
+}
