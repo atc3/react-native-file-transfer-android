@@ -1,11 +1,11 @@
 {
-  "name": "react-native-image-upload-android",
+  "name": "react-native-file-transfer-android",
   "version": "0.0.1",
-  "description": "multipart/form-data image upload for react-native android",
+  "description": "multipart/form-data file upload for react-native android",
   "main": "index.js",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/blahoink/react-native-image-upload-android.git"
+    "url": "git+https://github.com/blahoink/react-native-file-transfer-android.git"
   },
   "keywords": [
     "react-native",
@@ -19,9 +19,9 @@
   "author": "Albert Chen",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/blahoink/react-native-image-upload-android/issues"
+    "url": "https://github.com/blahoink/react-native-file-transfer-android/issues"
   },
-  "homepage": "https://github.com/blahoink/react-native-image-upload-android#readme",
+  "homepage": "https://github.com/blahoink/react-native-file-transfer-android#readme",
   "peerDependencies": {
     "react-native": ">=0.16.0"
   }
