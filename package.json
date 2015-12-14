@@ -1,6 +1,6 @@
 {
   "name": "react-native-file-transfer-android",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "multipart/form-data file upload for react-native android",
   "main": "index.js",
   "repository": {
