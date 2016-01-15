@@ -1,19 +1,14 @@
 package com.burlap.filetransfer;
 
-import android.app.DownloadManager;
-import android.content.Context;
 import android.util.Log;
 import android.net.Uri;
 
-import com.facebook.react.bridge.NativeModule;
+
 import com.facebook.react.bridge.ReactApplicationContext;
-import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.Callback;
 import com.facebook.react.bridge.ReadableMap;
-
-import org.json.*;
 
 import com.facebook.react.bridge.ReadableMapKeySetIterator;
 import com.facebook.react.bridge.ReadableType;
@@ -25,13 +20,8 @@ import com.squareup.okhttp.Request;
 import com.squareup.okhttp.RequestBody;
 import com.squareup.okhttp.Response;
 
-import java.util.Map;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.FileNotFoundException;
-import java.util.HashMap;
 
 import okio.Buffer;
 
@@ -39,10 +29,6 @@ import okio.Buffer;
 public class FileTransferModule extends ReactContextBaseJavaModule {
 
   private final OkHttpClient client = new OkHttpClient();
-
-  private static String siteUrl = "http://joinbevy.com";
-  private static String apiUrl = "http://api.joinbevy.com";
-  private static Integer port = 80;
 
   private String TAG = "ImageUploadAndroid";
 
@@ -58,10 +44,10 @@ public class FileTransferModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void upload(ReadableMap options, Callback complete) {
-
         final Callback completeCallback = complete;
 
         try {
+            String fileKey = options.getString("fileKey");
             String uri = options.getString("uri");
             Uri file_uri = Uri.parse(uri);
             File file = new File(file_uri.getPath());
@@ -85,7 +71,7 @@ public class FileTransferModule extends ReactContextBaseJavaModule {
             bodyBuilder.type(MultipartBuilder.FORM)
                     .addPart(
                             Headers.of("Content-Disposition",
-                                    "form-data; name=\"file\"; filename=\"" + fileName + "\""
+                                    "form-data; name=\"" + fileKey + "\"; filename=\"" + fileName + "\""
                             ),
                             RequestBody.create(mediaType, file)
                     )
@@ -96,12 +82,14 @@ public class FileTransferModule extends ReactContextBaseJavaModule {
                             RequestBody.create(null, fileName)
                     );
 
+            // build request body
             ReadableMapKeySetIterator dataIterator = data.keySetIterator();
             while(dataIterator.hasNextKey()) {
                 String key = dataIterator.nextKey();
-                String value = headers.getString(key);
-                ReadableType type = headers.getType(key);
+                String value = data.getString(key);
+                ReadableType type = data.getType(key);
                 bodyBuilder.addFormDataPart(key, value);
+                Log.d(TAG, "key=" + key + ", type=" + type + ", value=" + value);
             }
             RequestBody requestBody = bodyBuilder.build();
 
@@ -112,7 +100,6 @@ public class FileTransferModule extends ReactContextBaseJavaModule {
                 String key = headerIterator.nextKey();
                 String value = headers.getString(key);
                 ReadableType type = headers.getType(key);
-
                 headerBuilder.add(key, value);
             }
 
