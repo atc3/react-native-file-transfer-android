@@ -14,6 +14,9 @@ import com.facebook.react.bridge.Callback;
 import com.facebook.react.bridge.ReadableMap;
 
 import org.json.*;
+
+import com.facebook.react.bridge.ReadableMapKeySetIterator;
+import com.facebook.react.bridge.ReadableType;
 import com.squareup.okhttp.Headers;
 import com.squareup.okhttp.MediaType;
 import com.squareup.okhttp.MultipartBuilder;
@@ -29,6 +32,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.FileNotFoundException;
 import java.util.HashMap;
+
+import okio.Buffer;
 
 
 public class FileTransferModule extends ReactContextBaseJavaModule {
@@ -51,63 +56,96 @@ public class FileTransferModule extends ReactContextBaseJavaModule {
     return "FileTransfer";
   }
 
-  @ReactMethod
-  public void upload(ReadableMap options, Callback complete) {
+    @ReactMethod
+    public void upload(ReadableMap options, Callback complete) {
 
-    final Callback completeCallback = complete;
+        final Callback completeCallback = complete;
 
-    try {
+        try {
+            String uri = options.getString("uri");
+            Uri file_uri = Uri.parse(uri);
+            File file = new File(file_uri.getPath());
 
-      String uri = options.getString("uri");
-      Uri file_uri = Uri.parse(uri);
-      File file = new File(file_uri.getPath());
+            if(file == null) {
+                Log.d(TAG, "FILE NOT FOUND");
+                completeCallback.invoke("FILE NOT FOUND", null);
+                return;
+            }
 
-      if(file == null) {
-        Log.d(TAG, "FILE NOT FOUND");
-        completeCallback.invoke("FILE NOT FOUND", null);
-          return;
-      }
+            String url = options.getString("uploadUrl");
+            String mimeType = options.getString("mimeType");
+            String fileName = options.getString("fileName");
+            ReadableMap headers = options.getMap("headers");
+            ReadableMap data = options.getMap("data");
 
-      String url = options.getString("uploadUrl");
-      String mimeType = options.getString("mimeType");
-      String fileName = options.getString("fileName");
-      ReadableMap headers = options.getMap("headers");
-      ReadableMap data = options.getMap("data");
+            MediaType mediaType = MediaType.parse(mimeType);
 
-        MediaType mediaType = MediaType.parse(mimeType);
+            // build data
+            MultipartBuilder bodyBuilder = new MultipartBuilder();
+            bodyBuilder.type(MultipartBuilder.FORM)
+                    .addPart(
+                            Headers.of("Content-Disposition",
+                                    "form-data; name=\"file\"; filename=\"" + fileName + "\""
+                            ),
+                            RequestBody.create(mediaType, file)
+                    )
+                    .addPart(
+                            Headers.of("Content-Disposition",
+                                    "form-data; name=\"filename\""
+                            ),
+                            RequestBody.create(null, fileName)
+                    );
 
-        RequestBody requestBody = new MultipartBuilder()
-                .type(MultipartBuilder.FORM)
-                .addPart(
-                        Headers.of("Content-Disposition",
-                                "form-data; name=\"file\"; filename=\"" + fileName + "\""
-                        ),
-                        RequestBody.create(mediaType, file)
-                )
-                .addPart(
-                        Headers.of("Content-Disposition",
-                                "form-data; name=\"filename\""
-                        ),
-                        RequestBody.create(null, fileName)
-                )
-                .build();
+            ReadableMapKeySetIterator dataIterator = data.keySetIterator();
+            while(dataIterator.hasNextKey()) {
+                String key = dataIterator.nextKey();
+                String value = headers.getString(key);
+                ReadableType type = headers.getType(key);
+                bodyBuilder.addFormDataPart(key, value);
+            }
+            RequestBody requestBody = bodyBuilder.build();
 
-        Request request = new Request.Builder()
-                .header("Accept", "application/json")
-                .url(url)
-                .post(requestBody)
-                .build();
+            // build header
+            Headers.Builder headerBuilder = new Headers.Builder();
+            ReadableMapKeySetIterator headerIterator = headers.keySetIterator();
+            while(headerIterator.hasNextKey()) {
+                String key = headerIterator.nextKey();
+                String value = headers.getString(key);
+                ReadableType type = headers.getType(key);
 
-        Response response = client.newCall(request).execute();
-        if (!response.isSuccessful()) {
-            Log.d(TAG, "Unexpected code" + response);
-            completeCallback.invoke(response, null);
-            return;
+                headerBuilder.add(key, value);
+            }
+
+            Request request = new Request.Builder()
+                    .headers(headerBuilder.build())
+                    .url(url)
+                    .post(requestBody)
+                    .build();
+
+            Log.d(TAG, "request = " + bodyToString(request));
+
+            Response response = client.newCall(request).execute();
+            if (!response.isSuccessful()) {
+                Log.d(TAG, "Unexpected code" + response);
+                completeCallback.invoke(response, null);
+                return;
+            }
+
+            completeCallback.invoke(null, response.body().string());
+        } catch(Exception e) {
+            Log.d(TAG, e.toString());
         }
-
-        completeCallback.invoke(null, response.body().string());
-    } catch(Exception e) {
-      Log.d(TAG, e.toString());
     }
-  }
+
+    private static String bodyToString(final Request request){
+
+        try {
+            final Request copy = request.newBuilder().build();
+            final Buffer buffer = new Buffer();
+            copy.body().writeTo(buffer);
+            return buffer.readUtf8();
+        } catch (final IOException e) {
+            return "did not work";
+        }
+    }
 }
