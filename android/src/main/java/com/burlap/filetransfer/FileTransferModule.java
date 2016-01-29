@@ -109,7 +109,8 @@ public class FileTransferModule extends ReactContextBaseJavaModule {
                     .post(requestBody)
                     .build();
 
-            Log.d(TAG, "request = " + bodyToString(request));
+            // this will cause oom
+            // Log.d(TAG, "request = " + bodyToString(request));
 
             Response response = client.newCall(request).execute();
             if (!response.isSuccessful()) {
