@@ -4,6 +4,7 @@ import android.util.Log;
 import android.net.Uri;
 
 
+import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
@@ -12,6 +13,8 @@ import com.facebook.react.bridge.ReadableMap;
 
 import com.facebook.react.bridge.ReadableMapKeySetIterator;
 import com.facebook.react.bridge.ReadableType;
+import com.facebook.react.bridge.WritableMap;
+import com.facebook.react.modules.core.DeviceEventManagerModule;
 import com.squareup.okhttp.Headers;
 import com.squareup.okhttp.MediaType;
 import com.squareup.okhttp.MultipartBuilder;
@@ -28,19 +31,29 @@ import okio.Buffer;
 
 public class FileTransferModule extends ReactContextBaseJavaModule {
 
-  private final OkHttpClient client = new OkHttpClient();
+    private final OkHttpClient client = new OkHttpClient();
 
-  private String TAG = "ImageUploadAndroid";
+    private String TAG = "ImageUploadAndroid";
+    private ReactApplicationContext reactContext;
 
-  public FileTransferModule(ReactApplicationContext reactContext) {
-    super(reactContext);
-  }
+    public FileTransferModule(ReactApplicationContext reactContext) {
+        super(reactContext);
+        this.reactContext = reactContext;
+    }
 
-  @Override
-  public String getName() {
-    // match up with the IOS name
-    return "FileTransfer";
-  }
+    @Override
+    public String getName() {
+        // match up with the IOS name
+        return "FileTransfer";
+    }
+
+    private void sendProgressJSEvent(double progress) {
+        WritableMap map = Arguments.createMap();
+        map.putDouble("progress", progress);
+
+        reactContext.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
+                .emit("upload_progress", map);
+    }
 
     @ReactMethod
     public void upload(ReadableMap options, Callback complete) {
@@ -91,7 +104,17 @@ public class FileTransferModule extends ReactContextBaseJavaModule {
                 bodyBuilder.addFormDataPart(key, value);
                 Log.d(TAG, "key=" + key + ", type=" + type + ", value=" + value);
             }
-            RequestBody requestBody = bodyBuilder.build();
+            RequestBody requestBody = new CountingRequestBody(bodyBuilder.build(), new CountingRequestBody.Listener() {
+                @Override
+                public void onRequestProgress(long bytesWritten, long contentLength) {
+                    Log.d(TAG, bytesWritten + "/" + contentLength);
+                    if (contentLength == 0) {
+                        sendProgressJSEvent(0.9);
+                    } else {
+                        sendProgressJSEvent((double) bytesWritten / contentLength);
+                    }
+                }
+            });
 
             // build header
             Headers.Builder headerBuilder = new Headers.Builder();
@@ -126,7 +149,6 @@ public class FileTransferModule extends ReactContextBaseJavaModule {
     }
 
     private static String bodyToString(final Request request){
-
         try {
             final Request copy = request.newBuilder().build();
             final Buffer buffer = new Buffer();
