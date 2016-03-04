@@ -108,7 +108,7 @@ public class FileTransferModule extends ReactContextBaseJavaModule {
                 @Override
                 public void onRequestProgress(long bytesWritten, long contentLength) {
                     Log.d(TAG, bytesWritten + "/" + contentLength);
-                    if (contentLength == 0) {
+                    if (contentLength <= 0) {
                         sendProgressJSEvent(0.9);
                     } else {
                         sendProgressJSEvent((double) bytesWritten / contentLength);

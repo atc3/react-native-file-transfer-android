@@ -1,5 +1,7 @@
 package com.burlap.filetransfer;
 
+import android.util.Log;
+
 import com.squareup.okhttp.MediaType;
 import com.squareup.okhttp.RequestBody;
 
@@ -41,6 +43,7 @@ public class CountingRequestBody extends RequestBody {
         try {
             return delegate.contentLength();
         } catch (IOException e) {
+            Log.e("CountingRequestBody", "fail to get content length" + e.getLocalizedMessage());
             e.printStackTrace();
         }
 
