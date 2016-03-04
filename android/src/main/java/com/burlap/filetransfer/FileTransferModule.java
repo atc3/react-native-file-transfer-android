@@ -31,8 +31,6 @@ import okio.Buffer;
 
 public class FileTransferModule extends ReactContextBaseJavaModule {
 
-    private final OkHttpClient client = new OkHttpClient();
-
     private String TAG = "ImageUploadAndroid";
     private ReactApplicationContext reactContext;
 
@@ -57,6 +55,7 @@ public class FileTransferModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void upload(ReadableMap options, Callback complete) {
+        final OkHttpClient client = new OkHttpClient();
         final Callback completeCallback = complete;
 
         try {
