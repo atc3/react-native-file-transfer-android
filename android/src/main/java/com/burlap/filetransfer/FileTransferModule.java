@@ -1,8 +1,8 @@
 package com.burlap.filetransfer;
 
+import android.support.annotation.NonNull;
 import android.util.Log;
 import android.net.Uri;
-
 
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.ReactApplicationContext;
@@ -24,10 +24,6 @@ import com.squareup.okhttp.RequestBody;
 import com.squareup.okhttp.Response;
 
 import java.io.File;
-import java.io.IOException;
-
-import okio.Buffer;
-
 
 public class FileTransferModule extends ReactContextBaseJavaModule {
 
@@ -45,26 +41,18 @@ public class FileTransferModule extends ReactContextBaseJavaModule {
         return "FileTransfer";
     }
 
-    private void sendProgressJSEvent(double progress) {
-        WritableMap map = Arguments.createMap();
-        map.putDouble("progress", progress);
-
-        reactContext.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
-                .emit("upload_progress", map);
-    }
-
     @ReactMethod
-    public void upload(ReadableMap options, Callback complete) {
+    public void upload(ReadableMap options, final Callback completeCallback) {
         final OkHttpClient client = new OkHttpClient();
-        final Callback completeCallback = complete;
 
         try {
             String fileKey = options.getString("fileKey");
-            String uri = options.getString("uri");
-            Uri file_uri = Uri.parse(uri);
-            File file = new File(file_uri.getPath());
 
-            if(file == null) {
+            // file from uri
+            String uri = options.getString("uri");
+            File file = getFile(uri);
+
+            if (!file.exists()) {
                 Log.d(TAG, "FILE NOT FOUND");
                 completeCallback.invoke("FILE NOT FOUND", null);
                 return;
@@ -76,67 +64,20 @@ public class FileTransferModule extends ReactContextBaseJavaModule {
             ReadableMap headers = options.getMap("headers");
             ReadableMap data = options.getMap("data");
 
-            MediaType mediaType = MediaType.parse(mimeType);
+            Headers.Builder headerBuilder = createHeaders(headers);
+            RequestBody requestBody = createRequestBody(fileKey, file, fileName, data, mimeType);
+            requestBody = getCountingRequestBody(requestBody);
 
-            // build data
-            MultipartBuilder bodyBuilder = new MultipartBuilder();
-            bodyBuilder.type(MultipartBuilder.FORM)
-                    .addPart(
-                            Headers.of("Content-Disposition",
-                                    "form-data; name=\"" + fileKey + "\"; filename=\"" + fileName + "\""
-                            ),
-                            RequestBody.create(mediaType, file)
-                    )
-                    .addPart(
-                            Headers.of("Content-Disposition",
-                                    "form-data; name=\"filename\""
-                            ),
-                            RequestBody.create(null, fileName)
-                    );
-
-            // build request body
-            ReadableMapKeySetIterator dataIterator = data.keySetIterator();
-            while(dataIterator.hasNextKey()) {
-                String key = dataIterator.nextKey();
-                String value = data.getString(key);
-                ReadableType type = data.getType(key);
-                bodyBuilder.addFormDataPart(key, value);
-                Log.d(TAG, "key=" + key + ", type=" + type + ", value=" + value);
-            }
-            RequestBody requestBody = new CountingRequestBody(bodyBuilder.build(), new CountingRequestBody.Listener() {
-                @Override
-                public void onRequestProgress(long bytesWritten, long contentLength) {
-                    Log.d(TAG, bytesWritten + "/" + contentLength);
-                    if (contentLength <= 0) {
-                        sendProgressJSEvent(0.9);
-                    } else {
-                        sendProgressJSEvent((double) bytesWritten / contentLength);
-                    }
-                }
-            });
-
-            // build header
-            Headers.Builder headerBuilder = new Headers.Builder();
-            ReadableMapKeySetIterator headerIterator = headers.keySetIterator();
-            while(headerIterator.hasNextKey()) {
-                String key = headerIterator.nextKey();
-                String value = headers.getString(key);
-                ReadableType type = headers.getType(key);
-                headerBuilder.add(key, value);
-            }
-
+            // ----- create request -----
             Request request = new Request.Builder()
                     .headers(headerBuilder.build())
                     .url(url)
                     .post(requestBody)
                     .build();
 
-            // this will cause oom
-            // Log.d(TAG, "request = " + bodyToString(request));
-
+            // ----- execute -----
             Response response = client.newCall(request).execute();
             if (!response.isSuccessful()) {
-                Log.d(TAG, "Unexpected code" + response);
                 completeCallback.invoke(response, null);
                 return;
             }
@@ -144,17 +85,85 @@ public class FileTransferModule extends ReactContextBaseJavaModule {
             completeCallback.invoke(null, response.body().string());
         } catch(Exception e) {
             Log.d(TAG, e.toString());
+            completeCallback.invoke(e.toString());
         }
     }
 
-    private static String bodyToString(final Request request){
-        try {
-            final Request copy = request.newBuilder().build();
-            final Buffer buffer = new Buffer();
-            copy.body().writeTo(buffer);
-            return buffer.readUtf8();
-        } catch (final IOException e) {
-            return "did not work";
+    @NonNull
+    private File getFile(String uri) {
+        Uri file_uri = Uri.parse(uri);
+        return new File(file_uri.getPath());
+    }
+
+    @NonNull
+    private RequestBody createRequestBody(
+            String fileKey, File file, String fileName, ReadableMap data, String mimeType
+    ) {
+        MediaType mediaType = MediaType.parse(mimeType);
+
+        // add file data
+        MultipartBuilder bodyBuilder = new MultipartBuilder();
+        bodyBuilder.type(MultipartBuilder.FORM)
+                .addPart(
+                        Headers.of("Content-Disposition",
+                                "form-data; name=\"" + fileKey + "\"; " +
+                                        "filename=\"" + fileName + "\""
+                        ),
+                        RequestBody.create(mediaType, file)
+                )
+                .addPart(
+                        Headers.of("Content-Disposition",
+                                "form-data; name=\"filename\""
+                        ),
+                        RequestBody.create(null, fileName)
+                );
+
+        // add extra data
+        ReadableMapKeySetIterator dataIterator = data.keySetIterator();
+        while (dataIterator.hasNextKey()) {
+            String key = dataIterator.nextKey();
+            String value = data.getString(key);
+            ReadableType type = data.getType(key);
+            bodyBuilder.addFormDataPart(key, value);
+            Log.d(TAG, "key=" + key + ", type=" + type + ", value=" + value);
         }
+
+        return bodyBuilder.build();
+    }
+
+    @NonNull
+    private RequestBody getCountingRequestBody(RequestBody requestBody) {
+        requestBody = new CountingRequestBody(requestBody, new CountingRequestBody.Listener() {
+            @Override
+            public void onRequestProgress(long bytesWritten, long contentLength) {
+                Log.d(TAG, bytesWritten + "/" + contentLength);
+                if (contentLength <= 0) {
+                    sendProgressJSEvent(0.9);
+                } else {
+                    sendProgressJSEvent((double) bytesWritten / contentLength);
+                }
+            }
+        });
+        return requestBody;
+    }
+
+    @NonNull
+    private Headers.Builder createHeaders(ReadableMap headers) {
+        Headers.Builder headerBuilder = new Headers.Builder();
+        ReadableMapKeySetIterator headerIterator = headers.keySetIterator();
+        while (headerIterator.hasNextKey()) {
+            String key = headerIterator.nextKey();
+            String value = headers.getString(key);
+            headerBuilder.add(key, value);
+        }
+        return headerBuilder;
+    }
+
+    private void sendProgressJSEvent(double progress) {
+        WritableMap map = Arguments.createMap();
+        map.putDouble("progress", progress);
+
+        reactContext.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
+                .emit("upload_progress", map);
     }
 }
