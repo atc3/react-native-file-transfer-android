@@ -15,12 +15,12 @@ public class FileTransferPackage implements ReactPackage {
   public FileTransferPackage() {}
 
   @Override
-  public List<NativeModule> createNativeModules(
-      ReactApplicationContext reactContext) {
-    List<NativeModule> modules = new ArrayList<>();
-    modules.add(new FileTransferModule(reactContext));
-    return modules;
+  public List<NativeModule> createNativeModules(ReactApplicationContext reactContext) {
+    return Arrays.<NativeModule>asList(
+        new FileTransferModule(reactContext)
+    );
   }
+
 
   @Override
   public List<Class<? extends JavaScriptModule>> createJSModules() {
