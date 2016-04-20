@@ -29,6 +29,8 @@ public class FileTransferModule extends ReactContextBaseJavaModule {
 
     private String TAG = "ImageUploadAndroid";
     private ReactApplicationContext reactContext;
+    private static int dataCounter = 0;
+    private final int dataFilterSize = 50;
 
     public FileTransferModule(ReactApplicationContext reactContext) {
         super(reactContext);
@@ -42,51 +44,59 @@ public class FileTransferModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void upload(ReadableMap options, final Callback completeCallback) {
-        final OkHttpClient client = new OkHttpClient();
+    public void upload(final ReadableMap options, final Callback completeCallback) {
 
-        try {
-            String fileKey = options.getString("fileKey");
+        Thread thread = new Thread() {
+            @Override
+            public void run() {
+                final OkHttpClient client = new OkHttpClient();
 
-            // file from uri
-            String uri = options.getString("uri");
-            File file = getFile(uri);
+                try {
+                    String fileKey = options.getString("fileKey");
 
-            if (!file.exists()) {
-                Log.d(TAG, "FILE NOT FOUND");
-                completeCallback.invoke("FILE NOT FOUND", null);
-                return;
+                    // file from uri
+                    String uri = options.getString("uri");
+                    File file = getFile(uri);
+
+                    if (!file.exists()) {
+                        Log.d(TAG, "FILE NOT FOUND");
+                        completeCallback.invoke("FILE NOT FOUND", null);
+                        return;
+                    }
+
+                    String url = options.getString("uploadUrl");
+                    String mimeType = options.getString("mimeType");
+                    String fileName = options.getString("fileName");
+                    ReadableMap headers = options.getMap("headers");
+                    ReadableMap data = options.getMap("data");
+
+                    Headers.Builder headerBuilder = createHeaders(headers);
+                    RequestBody requestBody = createRequestBody(fileKey, file, fileName, data, mimeType);
+                    requestBody = getCountingRequestBody(requestBody);
+
+                    // ----- create request -----
+                    Request request = new Request.Builder()
+                      .headers(headerBuilder.build())
+                      .url(url)
+                      .post(requestBody)
+                      .build();
+
+                    // ----- execute -----
+                    Response response = client.newCall(request).execute();
+                    if (!response.isSuccessful()) {
+                        completeCallback.invoke(response, null);
+                        return;
+                    }
+
+                    completeCallback.invoke(null, response.body().string());
+                } catch (Exception e) {
+                    Log.d(TAG, e.toString());
+                    completeCallback.invoke(e.toString());
+                }
             }
+        };
 
-            String url = options.getString("uploadUrl");
-            String mimeType = options.getString("mimeType");
-            String fileName = options.getString("fileName");
-            ReadableMap headers = options.getMap("headers");
-            ReadableMap data = options.getMap("data");
-
-            Headers.Builder headerBuilder = createHeaders(headers);
-            RequestBody requestBody = createRequestBody(fileKey, file, fileName, data, mimeType);
-            requestBody = getCountingRequestBody(requestBody);
-
-            // ----- create request -----
-            Request request = new Request.Builder()
-                    .headers(headerBuilder.build())
-                    .url(url)
-                    .post(requestBody)
-                    .build();
-
-            // ----- execute -----
-            Response response = client.newCall(request).execute();
-            if (!response.isSuccessful()) {
-                completeCallback.invoke(response, null);
-                return;
-            }
-
-            completeCallback.invoke(null, response.body().string());
-        } catch(Exception e) {
-            Log.d(TAG, e.toString());
-            completeCallback.invoke(e.toString());
-        }
+        thread.start();
     }
 
     @NonNull
@@ -131,17 +141,24 @@ public class FileTransferModule extends ReactContextBaseJavaModule {
         return bodyBuilder.build();
     }
 
+    private void incrementDataCounter() {
+        dataCounter++;
+        if (dataCounter > dataFilterSize)
+            dataCounter = 0;
+    }
+
     @NonNull
     private RequestBody getCountingRequestBody(RequestBody requestBody) {
         requestBody = new CountingRequestBody(requestBody, new CountingRequestBody.Listener() {
             @Override
             public void onRequestProgress(long bytesWritten, long contentLength) {
-                Log.d(TAG, bytesWritten + "/" + contentLength);
                 if (contentLength <= 0) {
                     sendProgressJSEvent(0.9);
-                } else {
+                } else if (dataCounter%dataFilterSize == 0) {
+                    Log.d(TAG, bytesWritten + "/" + contentLength);
                     sendProgressJSEvent((double) bytesWritten / contentLength);
                 }
+                incrementDataCounter();
             }
         });
         return requestBody;
