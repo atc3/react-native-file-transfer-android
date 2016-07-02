@@ -2,6 +2,8 @@ package com.burlap.filetransfer;
 
 import android.app.DownloadManager;
 import android.content.Context;
+import android.database.Cursor;
+import android.provider.MediaStore;
 import android.util.Log;
 import android.net.Uri;
 
@@ -11,16 +13,12 @@ import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.Callback;
+import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.ReadableMap;
+import com.facebook.react.bridge.ReadableMapKeySetIterator;
+import com.facebook.react.bridge.ReadableType;
 
 import org.json.*;
-import com.squareup.okhttp.Headers;
-import com.squareup.okhttp.MediaType;
-import com.squareup.okhttp.MultipartBuilder;
-import com.squareup.okhttp.OkHttpClient;
-import com.squareup.okhttp.Request;
-import com.squareup.okhttp.RequestBody;
-import com.squareup.okhttp.Response;
 
 import java.util.Map;
 import java.io.File;
@@ -30,6 +28,12 @@ import java.io.IOException;
 import java.io.FileNotFoundException;
 import java.util.HashMap;
 
+import okhttp3.MediaType;
+import okhttp3.MultipartBody;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 public class FileTransferModule extends ReactContextBaseJavaModule {
 
@@ -57,41 +61,57 @@ public class FileTransferModule extends ReactContextBaseJavaModule {
     final Callback completeCallback = complete;
 
     try {
+      MultipartBody.Builder mRequestBody = new MultipartBody.Builder()
+              .setType(MultipartBody.FORM);
 
-      String uri = options.getString("uri");
-      Uri file_uri = Uri.parse(uri);
-      File file = new File(file_uri.getPath());
+      ReadableArray files = options.getArray("files");
+      String url = options.getString("url");
 
-      if(file == null) {
-        Log.d(TAG, "FILE NOT FOUND");
-        completeCallback.invoke("FILE NOT FOUND", null);
-          return;
+      ReadableMap data = options.getMap("data");
+      ReadableMapKeySetIterator iterator = data.keySetIterator();
+
+      while(iterator.hasNextKey()){
+        String key = iterator.nextKey();
+        if(ReadableType.String.equals(data.getType(key))) {
+          mRequestBody.addFormDataPart(key, data.getString(key));
+        }
       }
 
-      String url = options.getString("uploadUrl");
-      String mimeType = options.getString("mimeType");
-      String fileName = options.getString("fileName");
-      ReadableMap headers = options.getMap("headers");
-      ReadableMap data = options.getMap("data");
 
-        MediaType mediaType = MediaType.parse(mimeType);
 
-        RequestBody requestBody = new MultipartBuilder()
-                .type(MultipartBuilder.FORM)
-                .addPart(
-                        Headers.of("Content-Disposition",
-                                "form-data; name=\"file\"; filename=\"" + fileName + "\""
-                        ),
-                        RequestBody.create(mediaType, file)
-                )
-                .addPart(
-                        Headers.of("Content-Disposition",
-                                "form-data; name=\"filename\""
-                        ),
-                        RequestBody.create(null, fileName)
-                )
-                .build();
+      if(files.size() != 0){
+        for(int fileIndex=0 ; fileIndex<files.size(); fileIndex++){
+          ReadableMap file = files.getMap(fileIndex);
+          String uri = file.getString("uri");
 
+          Uri file_uri;
+          if(uri.substring(0,10).equals("content://") ){
+            file_uri = Uri.parse(convertMediaUriToPath(Uri.parse(uri)));
+          }
+          else{
+            file_uri = Uri.parse(uri);
+          }
+
+          File imageFile = new File(file_uri.getPath());
+
+          if(imageFile == null){
+            Log.d(TAG, "FILE NOT FOUND");
+            completeCallback.invoke("FILE NOT FOUND", null);
+              return;
+          }
+
+          String mimeType = file.getString("mimeType");
+          MediaType mediaType = MediaType.parse(mimeType);
+          String name = file.getString("name");
+          String fileName = file.getString("fileName");
+
+          mRequestBody.addFormDataPart(name, fileName, RequestBody.create(mediaType, imageFile));
+        }
+      }
+
+
+
+        MultipartBody requestBody = mRequestBody.build();
         Request request = new Request.Builder()
                 .header("Accept", "application/json")
                 .url(url)
@@ -109,5 +129,16 @@ public class FileTransferModule extends ReactContextBaseJavaModule {
     } catch(Exception e) {
       Log.d(TAG, e.toString());
     }
+  }
+
+   public String convertMediaUriToPath(Uri uri) {
+    Context context = getReactApplicationContext();
+    String [] proj={MediaStore.Images.Media.DATA};
+    Cursor cursor = context.getContentResolver().query(uri, proj,  null, null, null);
+    int column_index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
+    cursor.moveToFirst();
+    String path = cursor.getString(column_index);
+    cursor.close();
+    return path;
   }
 }

@@ -38,30 +38,42 @@ mReactInstanceManager = ReactInstanceManager.builder()
 
 ```javascript
 var FileTransfer = require('react-native-file-transfer-android');
-FileTransfer.upload({
-  uri: uri,
-  uploadUrl: 'http://example.com/upload',
-  fileName: 'temp.jpg',
-  mimeType: 'image/jpg',
-  headers: {
-    'Accept': 'application/json'
-  },
-  data: {
-    
-  }
-}, (err, res) => {
-  if(err) {
-    console.error(err);
-  } else {
-    console.log(res);
-  }
-});
-```
 
+let files = [
+      {
+        name: 'testName',
+        fileName: 'testFileName.jpg',
+        uri: filePath, // filePath support local file patbh and content file path
+        mimeType: 'image/jpg',
+      },
+      {
+        name: 'testName2',
+        fileName: 'testFileName2.jpg',
+        uri: filePath, // filePath
+        mimeType: 'image/jpg',
+      },
+    ]
+FileTransfer.upload({
+        url: 'uploadURL',
+        files: files,
+        data: {
+          context: 'wow',
+          isposis: '222', // filePath support local file patbh and content file path
+        }
+      }, (err, res) => {
+        if(err) {
+          console.error(err);
+        } else {
+          console.log(res);
+        }
+      });
+```
+This module do not support header.
+header is always ("Accept", "application/json")
 #### Options
-* uri - uri of the file in the android filesystem
+* url - uri of the file in the android filesystem (support local file path and content file path)
 * uploadUrl - endpoint to upload the file to (uses POST)
+* name - fieldName of file
 * fileName - name of the file
 * mimeType - file type
-* headers - map of headers
-* data - any extra data you want sent to the server
+* data - any extra data you want sent to the server // only support string. not int, boolean. 
