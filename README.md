@@ -43,13 +43,13 @@ let files = [
       {
         name: 'testName',
         fileName: 'testFileName.jpg',
-        uri: filePath, // filePath only support uri
+        uri: filePath, // filePath support local file patbh and content file path
         mimeType: 'image/jpg',
       },
       {
         name: 'testName2',
         fileName: 'testFileName2.jpg',
-        uri: filePath, // filePath only support uri
+        uri: filePath, // filePath
         mimeType: 'image/jpg',
       },
     ]
@@ -58,7 +58,7 @@ FileTransfer.upload({
         files: files,
         data: {
           context: 'wow',
-          isposis: '222', // only support string
+          isposis: '222', // filePath support local file patbh and content file path
         }
       }, (err, res) => {
         if(err) {
@@ -71,7 +71,7 @@ FileTransfer.upload({
 This module do not support header.
 header is always ("Accept", "application/json")
 #### Options
-* url - uri of the file in the android filesystem
+* url - uri of the file in the android filesystem (support local file path and content file path)
 * uploadUrl - endpoint to upload the file to (uses POST)
 * name - fieldName of file
 * fileName - name of the file

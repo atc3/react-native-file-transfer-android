@@ -82,7 +82,15 @@ public class FileTransferModule extends ReactContextBaseJavaModule {
         for(int fileIndex=0 ; fileIndex<files.size(); fileIndex++){
           ReadableMap file = files.getMap(fileIndex);
           String uri = file.getString("uri");
-          Uri file_uri = Uri.parse(uri);
+
+          Uri file_uri;
+          if(uri.substring(0,10).equals("content://") ){
+            file_uri = Uri.parse(convertMediaUriToPath(Uri.parse(uri)));
+          }
+          else{
+            file_uri = Uri.parse(uri);
+          }
+
           File imageFile = new File(file_uri.getPath());
 
           if(imageFile == null){
@@ -120,5 +128,16 @@ public class FileTransferModule extends ReactContextBaseJavaModule {
     } catch(Exception e) {
       Log.d(TAG, e.toString());
     }
+  }
+
+   public String convertMediaUriToPath(Uri uri) {
+    Context context = getReactApplicationContext();
+    String [] proj={MediaStore.Images.Media.DATA};
+    Cursor cursor = context.getContentResolver().query(uri, proj,  null, null, null);
+    int column_index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
+    cursor.moveToFirst();
+    String path = cursor.getString(column_index);
+    cursor.close();
+    return path;
   }
 }
