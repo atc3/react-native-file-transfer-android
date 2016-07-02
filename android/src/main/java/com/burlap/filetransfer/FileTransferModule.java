@@ -2,6 +2,8 @@ package com.burlap.filetransfer;
 
 import android.app.DownloadManager;
 import android.content.Context;
+import android.database.Cursor;
+import android.provider.MediaStore;
 import android.util.Log;
 import android.net.Uri;
 
@@ -32,7 +34,6 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
-
 
 public class FileTransferModule extends ReactContextBaseJavaModule {
 
